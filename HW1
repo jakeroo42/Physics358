@@ -1,0 +1,200 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Created on Mon Sep 21 00:01:36 2020
+
+@author: jakerabinowitz
+"""
+
+import matplotlib 
+from pylab import xticks
+import numpy as np
+import matplotlib.pyplot as plt 
+import statistics as st
+import pandas as pd
+
+
+'''========================Question 2========================'''
+
+#Set the seed 
+np.random.seed(12345)
+
+
+# Problem 2a
+def generate_p_U(size, mu, W):
+
+    x = np.random.uniform(low = mu-W/2, high = mu + W/2, size = size)
+    return x
+    
+
+# Problem 2b
+def compute_statistics(x):
+   
+    #mean
+    mean = sum(x)/len(x)
+    
+    #initialize the variance 
+    variance = 0
+    for i in x:    
+        v = 1/(len(x)-1) * (i - mean)**2
+        variance += v
+        
+    #get standard deviation from 
+    stdv = np.sqrt(variance)
+    
+    #initialize the skewness #need to get the propper equation for the skew and kurotsis tomorrow 
+    skewness = 0
+    for i in x:    
+        s = (1/(len(x)-1)) * ((i - mean)/stdv)**3
+        skewness += s
+        
+    #initialize the kurtosis  
+    kurtosis = 0
+    for i in x:    
+        k = 1/(len(x)-2) * ((i - mean)/stdv)**4 
+        kurtosis += k 
+        kurtosis = kurtosis - 3 
+    
+    return mean, variance, skewness, kurtosis
+
+    
+# Problem 2c
+def theoretical_statistics(mu, W):
+    
+    mean = mu 
+    variance = (W**2)/12
+    skewness = 0
+    kurtosis = -6/5
+    
+    return mean, variance, skewness, kurtosis
+
+
+'''========================Question 3========================'''
+data = pd.read_csv(r"/Users/jakerabinowitz/Dropbox/Senior Year Fall/PHYS358/SATscores.csv", sep = ",")
+data.columns = ["ID", "Score"]
+
+
+# Problem 3a
+def calculate_mean_var(data):
+
+    data = data["Score"]
+    mean = st.mean(data)
+    variance = st.variance(data)
+    
+    return mean, variance
+
+
+# Problem 3b
+def plot_histogram(data, ax):
+
+    binwidth = 50
+    plt.hist(data["Score"], bins=range(min(data["Score"]), max(data["Score"]) + binwidth, binwidth), color="Green", edgecolor = "Blue")
+    plt.ylabel("Frequency")
+    plt.xlabel("SAT Score")
+    plt.title("SAT Scores (n = 1987)")
+    xticks(range(min(data["Score"]), max(data["Score"]), 50))
+
+# Make the figure and axes.  You can think of the "axes" as sub-plots in the full figure.
+# Here we just have 1, so the axis covers the entire figure.
+# The figsize option just makes the plot wider than the d  efault, so it's easier to read.
+fig, ax = plt.subplots(1, figsize=(16,6))
+
+# Draw the histogram on this axis
+plot_histogram(data, ax)
+
+# For the next part, we'll add another step here.  But for this one, just go ahead and show it now.
+plt.show()
+
+
+data = pd.read_csv(r"/Users/jakerabinowitz/Dropbox/Senior Year Fall/PHYS358/SATscores.csv", sep = ",")
+data.columns = ["ID", "Score"]
+# Problem 3c
+
+def plot_gaussian(data, ax):
+    
+    #Calling the mean_var function to calculate 
+    mu = calculate_mean_var(data)[0]
+    sigma = np.sqrt(calculate_mean_var(data)[1])
+    
+    
+    x = np.linspace(min(data["Score"]), max(data["Score"]), len(data["Score"]))
+    
+    #Gauss Curve; multiply by 10^5 to normalize it 
+    y = ((1 / (np.sqrt(2 * np.pi) * sigma)) * np.exp(-0.5 * (1 / sigma * (x - mu)) ** 2)) * 100000
+    
+    plt.axvline(x=mu, color = "Black")
+    plt.plot(x,y, "--", color = "Red")
+
+fig, ax = plt.subplots(1, figsize=(16,6))
+
+plot_histogram(data, ax)
+plot_gaussian(data, ax)
+
+plt.show()
+
+'''========================Question 4========================'''
+
+
+# Problem 4a, b
+
+def make_counts(ntot, nbins):  
+    ntot = int(ntot)
+    
+    #Create an array of 
+    x = np.random.random(ntot)*10
+    x_btw_0_1 = x[x < 1]
+    
+    hist = np.histogram(x_btw_0_1, nbins)
+    
+    return list(hist[0])
+
+
+#I put the _4 there so the functions arent named the same thing as in the other
+#parts of the question. I fixed this in Jupyter Notebooks
+def calculate_mean_var_4(x):
+
+    mean = st.mean(x)
+    variance = st.variance(x)
+    
+    return mean, variance
+
+
+###############DELETE THE Z PART WHEN YOU PUT IT IN JUPYTER
+def run_simulation(M, N, nbins):
+    
+    #initialize the 2 lists of mu_i and variance_i 
+    mu_i = []
+    var_i = []
+    
+    #loop through M times and fill the lists with the mean and variance values
+    for i in range(M):
+        mu_i.append(calculate_mean_var_4(make_counts(N, nbins))[0])
+        var_i.append(calculate_mean_var_4(make_counts(N, nbins))[1])
+                
+    #Calculate the mean and variance of the two lists
+    #For mu_i
+    mean_mu_i = calculate_mean_var_4(mu_i)[0]
+    var_mu_i = calculate_mean_var_4(mu_i)[1]
+
+    #For var_i
+    mean_var_i = calculate_mean_var_4(var_i)[0]
+    var_var_i = calculate_mean_var_4(var_i)[1]
+
+    return mean_mu_i, var_mu_i, mean_var_i, var_var_i
+
+
+run_simulation(100, 10e6, 100)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
