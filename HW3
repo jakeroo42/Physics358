@@ -1,0 +1,283 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Created on Thu Oct 15 22:36:09 2020
+
+@author: jakerabinowitz
+"""
+
+
+import numpy as np 
+import os 
+import pandas as pd
+import statistics as st
+import matplotlib.pyplot as plt
+import matplotlib.patches as mpatches
+
+
+
+data = np.genfromtxt('/Users/jakerabinowitz/Desktop/GravityMeasurements.dat.txt', names=['ID','H','sigma_H','t','sigma_t'])
+data = pd.DataFrame(data)
+
+
+# Problem 1a
+def calculate_g(data):
+    """Given measurements of H and t, calculate the inferred gravitational acceleration constant, g.
+    
+    The input height (H) and time (t) are given as data['H'] and data['t'].
+    
+    Returns an array with the corresponding g values.
+    """
+    data = pd.DataFrame(data)
+    data["g"] = (2 * data["H"]) / ( data["t"] ** 2 )
+
+    return data["g"]
+
+
+# Problem 1b
+def propagate_sigma_g(data):
+    """Calculate the uncertainties in the g measurement based on the reported uncertainties in H and t.
+    
+    The input height (H) and time (t) are given as data['H'] and data['t'].
+    Their respective estimated uncertainties are data['sigma_H'] and data['sigma_t'].
+    
+    Returns an array with the corresponding sigma_g values.
+    """
+    
+    #g(h,t) = 2H/t^2
+    #dg/dh = 2/t^2
+    #dg/dt = -4Ht^-3
+    
+    data = pd.DataFrame(data)
+    data["sigma_g"] = np.sqrt(((2 / (data["t"] ** 2)) * data["sigma_H"]) ** 2 + ( -4 * data["H"] * (data["t"] ** -3) * data["sigma_t"] ) ** 2)
+    
+    return data["sigma_g"]
+
+
+# Problem 1c
+def estimate_unweighted_sigma_g(data):
+    """Estimate an overall estimate of the uncertainties in the g values based on the empirical
+    standard deviation.
+    
+    This estimate ignores the students' own estimates of the uncertainties on H and t, and instead
+    just uses their calculated g values.
+    
+    Returns a single (not array) value sigma_g.
+    """
+    data = pd.DataFrame(data)
+    data["g"] =  calculate_g(data)
+    var_g = st.variance(data["g"])
+    sigma_g = np.sqrt(var_g)
+    return sigma_g
+
+estimate_unweighted_sigma_g(data)
+
+
+
+# Problem 1d
+def calculate_unweighted_mle_meang(data):
+    """Estimate the unweighted maximum-likelihood estimate of <g> and its uncertainty.
+    
+    This estimate ignores the students' own estimates of the uncertainties on H and t.
+    
+    Returns a tuple of two values: <g>, sigma_<g>
+    """
+    data = pd.DataFrame(data)
+    data["g"] = calculate_g(data)
+    sigma_g = estimate_unweighted_sigma_g(data)
+    mean_g = np.mean(data["g"])
+    mle_sigma_g = sigma_g / np.sqrt(data.shape[0])
+    
+    return mean_g, mle_sigma_g
+
+
+# Problem 1e
+def calculate_weighted_mle_meang(data):
+    """Estimate the inverse-variance weighted maximum-likelihood estimate of <g> and its uncertainty.
+    
+    This estimate uses the students' own estimates of the uncertainties on H and t to propagate
+    into a separate estimate of sigma_g for each data point.
+    
+    Returns a tuple of two values: <g>, sigma_<g>
+    """
+    
+    data = pd.DataFrame(data)
+    data["g"] = calculate_g(data)
+    data["sigma_g"] = propagate_sigma_g(data)
+    
+    
+    #inverse variance maximum-likelihood estimate of g  
+    numerator = 0 
+    for i in range(data.shape[0]):
+        numerator += data["g"][i] / data["sigma_g"][i] ** 2
+     
+    #denom here is equal to the weight    
+    denom = 0
+    for i in range(data.shape[0]):
+        denom += 1 / data["sigma_g"][i] ** 2
+    
+    inverse_var_mle_g = numerator / denom 
+       
+    #uncertainty on g 
+    
+    sigma_g = 1 / denom
+    
+    return inverse_var_mle_g, sigma_g
+
+
+
+#### question 2
+    
+# Problem 2a
+def calculate_mle_chisq(data):
+    """Calculate chisq for the inverse-variance weighted MLE estimate of mu'.
+    
+    The sigma_g values are based on the students' estimated uncertainties sigma_H and sigma_t.
+    
+    Returns chisq
+    """
+    
+    data = pd.DataFrame(data)
+    data["g"] = calculate_g(data)
+    data["sigma_g"] = propagate_sigma_g(data)
+    
+    mu_prime = calculate_weighted_mle_meang(data)[0]
+
+    #loop to define chi^2
+    
+    chisq = 0
+    for i in range(data.shape[0]):
+        chisq += ((data['g'][i] - mu_prime) / data["sigma_g"][i]) **2
+        
+    return chisq
+
+# Problem 2b
+def calculate_chisq_range(data, min_mu, max_mu):
+    """Calculate chisq over a range of mu values from min_mu to max_mu in steps of 0.001
+    
+    This function will generate an array of mu values over the given range.
+    For each value of mu, it will calculate the corresponding chisq value.
+
+    The sigma_g values are based on the students' estimated uncertainties sigma_H and sigma_t.
+
+    Note: The output mu values should be monotonically increasing.
+    
+    Returns mu_array, chisq_array as arrays of equal length.
+    """
+    data = pd.DataFrame(data)
+    
+    data["g"] = calculate_g(data)
+    data["sigma_g"] = propagate_sigma_g(data)
+    
+    #create a list of mu values
+    mu = np.arange(min_mu, max_mu, 0.001)
+    
+    #initialize the chisq list
+    chisq_list = []
+    
+    for mu_prime in mu: 
+    #initialize each value of the chisq
+        chisq = 0
+        for i in range(data.shape[0]):
+            chisq += ((data['g'][i] - mu_prime) / data["sigma_g"][i]) ** 2
+        
+        chisq_list.append(chisq)
+           
+    return mu, chisq_list
+
+
+def find_minimum_chisq(mu_array, chisq_array):
+    """Find the minimum chisq and its corresponding mu, given arrays of each.
+    
+    Returns mu_minimum, chisq_minimum
+    """
+    
+    #use the where function to get the index of the min chisq value in the chisq_array
+    min_chisq = min(chisq_array)
+    
+    min_chisq_index = np.where(chisq_array == min_chisq)[0][0]
+    mu_value = mu_array[min_chisq_index]
+    
+    return mu_value, min_chisq
+
+
+# Problem 2c:
+def find_one_sigma_range(mu_array, chisq_array):
+    """Find a range of mu values where chisq < min_chisq + 1.0, given arrays of mu and chisq.
+    
+    Note: the input values in mu_array may be assumed to be monotonically increasing.
+    
+    Returns min_mu, max_mu.
+    """
+
+    #get the min value in the ch    
+    min_chisq = min(chisq_array)
+    
+    #find range of indexes between where the min of chisq and the min of chisq + 1
+    idx = (chisq_array > min(chisq_array)) * (chisq_array < min_chisq + 1)
+    idxs = np.where(idx)[0]
+    
+    #use those same indexes to get a matching list of mu values 
+    mu_range = mu_array[idxs]
+    
+    return min(mu_range), max(mu_range)
+
+
+def plot_sigma_range(mu_array, chisq_array):
+    
+    min_chisq = min(chisq_array)
+    
+    #find range of indexes between where the min of chisq and the min of chisq + 1
+    idx = (chisq_array > min(chisq_array)) * (chisq_array < min_chisq + 1)
+    idxs = np.where(idx)[0]
+    
+    #use those same indexes to get a matching list of mu values 
+    mu_range = mu_array[idxs]
+    chisq_range = np.asarray(chisq_array)[idxs]
+    
+    
+    mean_g = (find_one_sigma_range(mu_array, chisq_array)[0] + find_one_sigma_range(mu_array, chisq_array)[1]) / 2 
+    
+    plt.plot(mu_range, chisq_range, '.', color = 'blue')
+    plt.axvline(x=mean_g, color = 'r') 
+    plt.title("Chi Squared as a function of mu', Within 1 Standard Deviation of the MLE Mean")
+    plt.ylabel("Chi Squared")
+    plt.xlabel("mu' (Calculated Values of Gravity)")
+    red_patch = mpatches.Patch(color='red', label='MLE Mean = 9.753')
+    plt.grid()
+    plt.legend(handles=[red_patch])
+    plt.show()
+    
+    return 
+
+
+
+
+m = calculate_chisq_range(data, 9.6, 10)[0]
+c = calculate_chisq_range(data, 9.6, 10)[1]
+
+
+
+
+
+plot_sigma_range(m, c)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

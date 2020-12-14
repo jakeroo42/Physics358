@@ -1,0 +1,205 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Created on Mon Nov 30 23:18:36 2020
+
+@author: jakerabinowitz
+"""
+
+import numpy as np
+import pandas as pd
+import statistics as stat
+import matplotlib.pyplot as plt
+from scipy.optimize import curve_fit
+import itertools
+
+
+ListE = [['a','b'], ['c']]
+
+pd.DataFrame(np.genfromtxt('run0.dat', names=['E', 'N']))
+
+
+# Problem 1a
+def read_riggs_data(n):
+    """
+    Read the data file for run n, where 0 <= n <= 9.
+    
+    The file name is run[n].dat.  (I.e. run0.dat, run1.dat, ... run9.dat)
+    
+    Returns E, N for this run as numpy arrays
+    """
+    
+    #Initialize the lists
+    ListE = []
+    ListN = []
+    
+    #Import all the data
+    for i in range(n+1):
+        file = 'run' + str(i) + '.dat'
+        runi = pd.DataFrame(np.genfromtxt(file, names=['E', 'N']))
+        ListE.append(runi['E'])
+        ListN.append(runi['N'])
+        
+    #Concatenate the lists to continuous list
+    E = list(itertools.chain.from_iterable(ListE))
+    N = list(itertools.chain.from_iterable(ListN))
+       
+    return np.asarray(E), np.asarray(N)
+
+
+def riggs_model(E, a, b, c, A, E_Riggs, sigma_E):
+    """
+    Return the expected counts given the model for the Riggs boson.
+    
+        N(E) = a + b E + c E**2 + A exp(-(E-E_Riggs)**2/(2 sigma_E**2))
+    
+    On input, E is an array.  The other parameters are scalars.
+    
+    Returns N(E) given the model parameters.
+    """
+    return a + b*E + c*E**2 + A*np.exp(-(E-E_Riggs)**2 / (2*sigma_E**2))
+
+E, N = read_riggs_data(0)
+Nerror = np.sqrt(N)
+plt.xlabel("E")
+plt.ylabel("N")
+plt.title("E vs N for run0.dat with Poisson Error")
+
+plt.plot(E, N, '.')
+plt.errorbar(E, N, yerr = Nerror, fmt = " ", ecolor = "black", capsize = 2)
+plt.show()
+
+popt, pcov = curve_fit(riggs_model, E, N, sigma=Nerror, absolute_sigma=True, 
+                           bounds = ((-1e10, -1e10, -1e10, 0, 40, 1), (1e10, 1e10, 1e10, 1e10, 90, 5)))
+    
+
+
+def fit_riggs_model(E, N):
+    """
+    Find the best fit model given the observed data N(E)
+
+    Returns the parameters [a, b, c, A, E_Riggs, sigma_E] as a numpy array 
+    and the covariance matrix, also as a numpy array.
+    """
+    #Get the Poisson Error
+    Nerror = np.sqrt(N)
+    params, cov = curve_fit(riggs_model, E, N, sigma=Nerror, absolute_sigma=True, 
+                           bounds = ((-1e10, -1e10, -1e10, 0, 40, 1), 
+                                     (1e10, 1e10, 1e10, 1e10, 90, 5)))
+
+    return params, cov
+
+
+E, N = read_riggs_data(8)
+Nerror = np.sqrt(N)
+plt.xlabel("E")
+plt.ylabel("N")
+plt.title("E vs N for run0.dat with Poisson Error")
+
+
+plt.plot(E, N, '.')
+plt.errorbar(E, N, yerr = Nerror, fmt = " ", ecolor = "black", capsize = 2)
+plt.show()
+
+print("a = ", fit_riggs_model(E, N)[0][0], " +/- ", np.sqrt(fit_riggs_model(E, N)[1][0,0]))
+print("b = ", fit_riggs_model(E, N)[0][1], " +/- ", np.sqrt(fit_riggs_model(E, N)[1][1,1]))
+print("c = ", fit_riggs_model(E, N)[0][2], " +/- ", np.sqrt(fit_riggs_model(E, N)[1][2,2]))
+print("A = ", fit_riggs_model(E, N)[0][3], " +/- ", np.sqrt(fit_riggs_model(E, N)[1][3,3]))
+print("E_Riggs = ", fit_riggs_model(E, N)[0][4], " +/- ", np.sqrt(fit_riggs_model(E, N)[1][4,4]))
+print("sigma_E = ", fit_riggs_model(E, N)[0][5], " +/- ", np.sqrt(fit_riggs_model(E, N)[1][5,5]))
+
+def calculate_significance(params, cov):
+    """
+    Calculate the significance of a possible detection of the Riggs boson.
+    
+    params = [a, b, c, A, E_Riggs, sigma_E]
+    cov = the estimated covariance matrix
+    
+    Returns the S/N of the purported detection.
+    """
+    
+    #Standard deviation over number of pbservationns
+    # YOUR CODE HERE
+    raise NotImplementedError()
+    
+    
+    
+params, cov = fit_riggs_model(E, N)
+    
+def calculate_energy(params, cov):
+    """
+    Calculate the estimated value of E_Riggs and its uncertainty.
+
+    params = [a, b, c, A, E_Riggs, sigma_E]
+    cov = the estimated covariance matrix
+    
+    Returns the estimate of (E_Riggs, sigma(E_Riggs)).
+    """
+    E_Riggs = fit_riggs_model(E, N)[0][4]
+    sigma_E_Riggs = np.sqrt(fit_riggs_model(E, N)[1][4,4])
+    
+    return E_Riggs, sigma_E_Riggs
+
+E, N = read_riggs_data(9)
+calculate_energy(params, cov)
+
+################################################################
+
+sun_df = pd.read_csv('SunspotNumber.dat.txt', 
+                     names=['year', 'month', 'day', 'sunspots'],  # Give the names of the columns
+                     delim_whitespace=True,  # The default is to use ',' as the delimiter. 
+                     na_values=-1,  # Tell pandas that -1 means No Data.
+                    )
+
+sat_df = pd.read_csv('SatelliteReentry.dat.txt',
+                     names=['year', 'reentries'],  # Give the names of the columns
+                     delim_whitespace=True,  # The default is to use ',' as the delimiter. 
+                    )
+
+n_sunspots = sun_df.groupby(['year'])['sunspots'].mean()
+n_sunspots = pd.DataFrame(n_sunspots.reset_index()) #Reset index to get year as a col name
+
+
+
+sun_year_data = pd.DataFrame(n_sunspots[n_sunspots['year'].isin(list(sat_df["year"]))])
+
+
+# Problem 2a
+def read_sat_data():
+    """Read the satellite and sunspot data and convert sunspots to mean number per year.
+    
+    Returns n_sunspots, n_satellites as numpy arrays.
+    """
+    
+    #Import the data
+    sun_df = pd.read_csv('SunspotNumber.dat.txt', 
+                     names=['year', 'month', 'day', 'sunspots'],  # Give the names of the columns
+                     delim_whitespace=True,  # The default is to use ',' as the delimiter. 
+                     na_values=-1,  # Tell pandas that -1 means No Data.
+                    )
+
+    sat_df = pd.read_csv('SatelliteReentry.dat.txt',
+                     names=['year', 'reentries'],  # Give the names of the columns
+                     delim_whitespace=True,  # The default is to use ',' as the delimiter. 
+                    )
+
+    #Get the mean by year and make sure the years btw the two data sets match up
+    n_sunspots = sun_df.groupby(['year'])['sunspots'].mean()
+    n_sunspots = pd.DataFrame(n_sunspots.reset_index()) #Reset index to get year as a col name
+    sun_year_data = pd.DataFrame(n_sunspots[n_sunspots['year'].isin(list(sat_df["year"]))])
+
+   
+    return sun_year_data["sunspots"].values, sat_df["reentries"].values
+
+
+
+
+
+
+
+
+
+
+
+
+
